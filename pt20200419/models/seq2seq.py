@@ -3,48 +3,54 @@ from encoders import encoder
 from decoders import decoder
 from utils.data_utils import load_word2vec
 
-
 class SequenceToSequence(tf.keras.Model):
     def __init__(self, params):
         super(SequenceToSequence, self).__init__()
         self.embedding_matrix = load_word2vec(params)
         self.params = params
-        self.encoder = encoder.Encoder(params["vocab_size"],
-                                           params["embed_size"],
-                                           params["enc_units"],
-                                           params["batch_size"],
-                                           self.embedding_matrix)
-        self.attention = decoder.BahdanauAttention(params["attn_units"])
-        self.decoder = decoder.Decoder(params["vocab_size"],
-                                           params["embed_size"],
-                                           params["dec_units"],
-                                           params["batch_size"],
-                                           self.embedding_matrix)
+        print(params["batch_size"])
+        self.encoder = encoder.Encoder(vocab_size = params["vocab_size"],
+                               embedding_dim = params["embed_size"],
+                               embedding_matrix = self.embedding_matrix,
+                               enc_units = params["enc_units"],
+                               batch_size = params["batch_size"])
 
-    def call_encoder(self, enc_inp):
-        enc_hidden = self.encoder.initialize_hidden_state()
-        # [batch_sz, max_train_x, enc_units], [batch_sz, enc_units]
-        enc_output, enc_hidden = self.encoder.call(enc_inp, enc_hidden)
-        return enc_output, enc_hidden
+        self.attention = decoder.BahdanauAttention(units = params["attn_units"])
 
-    def call(self, enc_output, dec_hidden, enc_inp, dec_inp):
-        if self.params["mode"] == "train":
-            outputs = self._decode_target(enc_output, dec_hidden, dec_inp)
-            return outputs
+        self.decoder = decoder.Decoder(vocab_size =  params["vocab_size"],
+                               embedding_dim = params["embed_size"],
+                               embedding_matrix = self.embedding_matrix,
+                               dec_units = params["dec_units"],
+                               batch_size = params["batch_size"])
 
-    def _decode_target(self, enc_output, dec_hidden, dec_inp):
+    def call_decoder_onestep(self, dec_input, dec_hidden, enc_output):
+        # context_vector ()
+        # attention_weights ()
+        context_vector, attention_weights = self.attention(dec_hidden, enc_output)
+
+        # pred ()
+        pred, dec_hidden = self.decoder(dec_input,
+                                        None,
+                                        None,
+                                        context_vector)
+        return pred, dec_hidden, context_vector, attention_weights
+
+    def call(self, dec_input, dec_hidden, enc_output, dec_target):
         predictions = []
         attentions = []
-        context_vector, attn_dist = self.attention.call(dec_hidden,  # shape=(16, 256)
-                                                   enc_output)  # shape=(16, 200, 256)
-        for t in range(dec_inp.shape[1]):
-            dec_x, pred, dec_hidden = self.decoder.call(tf.expand_dims(dec_inp[:, t], 1),
-                                                   dec_hidden,
-                                                   enc_output,
-                                                   context_vector)
-            context_vector, attn_dist = self.attention.call(dec_hidden, enc_output)
-            predictions.append(pred)
-            attentions.append(attn_dist)
-        outputs = dict(logits=tf.stack(predictions, 1), dec_hidden=dec_hidden, attentions=attentions)
-        return outputs
 
+        context_vector, _ = self.attention(dec_hidden, enc_output)
+
+        for t in range(1, dec_target.shape[1]):
+            pred, dec_hidden = self.decoder(dec_input,
+                                            dec_hidden,
+                                            enc_output,
+                                            context_vector)
+
+            context_vector, attn = self.attention(dec_hidden, enc_output)
+            # using teacher forcing
+            dec_input = tf.expand_dims(dec_target[:, t], 1)
+
+            predictions.append(pred)
+            attentions.append(attn)
+        return tf.stack(predictions, 1), dec_hidden

@@ -1,31 +1,37 @@
 import tensorflow as tf
 
 
-class Encoder(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz, embedding_matrix):
+class Encoder(tf.keras.Model):
+    def __init__(self, vocab_size, embedding_dim, embedding_matrix, enc_units, batch_size):
         super(Encoder, self).__init__()
-        self.batch_sz = batch_sz
-        # self.enc_units = enc_units
-        self.enc_units = enc_units // 2
-        self.embedding = tf.keras.layers.Embedding(vocab_size,
-                                                   embedding_dim,
-                                                   weights=[embedding_matrix],
-                                                   trainable=True)
-        # tf.keras.layers.GRU自动匹配cpu、gpu
+        self.batch_size = batch_size
+        self.enc_units = enc_units
+        self.use_bi_gru = True
+        # 双向
+        if self.use_bi_gru:
+            self.enc_units = self.enc_units // 2
+
+        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weights=[embedding_matrix],
+                                                   trainable=False)
         self.gru = tf.keras.layers.GRU(self.enc_units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
+                                   return_sequences=True,
+                                   return_state=True,
+                                   recurrent_initializer='glorot_uniform')
 
-        self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
+        self.bi_gru = tf.keras.layers.Bidirectional(self.gru)
 
-    def call(self, x, hidden):
-        x = self.embedding(x)
-        hidden = tf.split(hidden, num_or_size_splits=2, axis=1)
-        output, forward_state, backward_state = self.bigru(x, initial_state=hidden)
-        state = tf.concat([forward_state, backward_state], axis=1)
-        # output, state = self.gru(x, initial_state=hidden)
-        return output, state
+    def call(self, enc_input):
+        # (batch_size, enc_len, embedding_dim)
+        enc_input_embedded = self.embedding(enc_input)
+        initial_state = self.gru.get_initial_state(enc_input_embedded)
 
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_sz, 2*self.enc_units))
+        if self.use_bi_gru:
+            # 是否使用双向GRU
+            output, forward_state, backward_state = self.bi_gru(enc_input_embedded, initial_state=initial_state * 2)
+            enc_hidden = tf.keras.layers.concatenate([forward_state, backward_state], axis=-1)
+
+        else:
+            # 单向GRU
+            output, enc_hidden = self.gru(enc_input_embedded, initial_state=initial_state)
+
+        return output, enc_hidden

@@ -8,7 +8,57 @@ UNKNOWN_TOKEN = '[UNK]'
 START_DECODING = '[START]'
 STOP_DECODING = '[STOP]'
 
-
+# class Vocab:
+#     PAD_TOKEN = '[PAD]'
+#     UNKNOWN_TOKEN = '[UNK]'
+#     START_DECODING = '[START]'
+#     STOP_DECODING = '[STOP]'
+#
+#     def __init__(self, vocab_file, vocab_max_size=None):
+#         """
+#         Vocab 对象,vocab基本操作封装
+#         :param vocab_file: Vocab 存储路径
+#         :param vocab_max_size: 最大字典数量
+#         """
+#         self.word2id, self.id2word = self.load_vocab(vocab_file, vocab_max_size)
+#         self.count = len(self.word2id)
+#
+#     @staticmethod
+#     def load_vocab(file_path, vocab_max_size=None):
+#         """
+#         读取字典
+#         :param file_path: 文件路径 (VOCAB_PAD)
+#         :param vocab_max_size: 最大字典数量
+#         :return: 返回读取后的字典
+#         """
+#
+#         vocab = {}
+#         reverse_vocab = {}
+#         for line in open(file_path, "r", encoding='utf-8').readlines():
+#             word, index = line.split()
+#             index = int(index)
+#             # 如果vocab 超过了指定大小
+#             # 跳出循环 截断
+#             if vocab_max_size and index > vocab_max_size:
+#                 print("max_size of vocab was specified as %i; we now have %i words. Stopping reading." % (
+#                     vocab_max_size, index))
+#                 break
+#             vocab[word] = index
+#             reverse_vocab[index] = word
+#         return vocab, reverse_vocab
+#
+#     def word_to_id(self, word):
+#         if word not in self.word2id:
+#             return self.word2id[UNKNOWN_TOKEN]
+#         return self.word2id[word]
+#
+#     def id_to_word(self, word_id):
+#         if word_id not in self.id2word:
+#             raise ValueError('Id not found in vocab: %d' % word_id)
+#         return self.id2word[word_id]
+#
+#     def size(self):
+#         return self.count
 class Vocab:
     def __init__(self, vocab_file, max_size):
         self.word2id = {UNKNOWN_TOKEN: 0, PAD_TOKEN: 1, START_DECODING: 2, STOP_DECODING: 3}
@@ -168,14 +218,14 @@ def example_generator(vocab, train_x_path, train_y_path, test_x_path, max_enc_le
 
             article_words = article.split()[:max_enc_len]
             enc_len = len(article_words)
-            print('enc_inp shape is final for dataset:',enc_len)
+            # print('enc_inp shape is final for dataset:',enc_len)
             # 添加mark标记
             # print('enc_len is', enc_len)
             sample_encoder_pad_mask = [1 for _ in range(enc_len)]
             # print('sample_encoder_pad_mask is', sample_encoder_pad_mask)
 
             enc_input = [vocab.word_to_id(w) for w in article_words]
-            print('enc_inp shape is final for dataset:', len(enc_input))
+            # print('enc_inp shape is final for dataset:', len(enc_input))
             enc_input_extend_vocab, article_oovs = article_to_ids(article_words, vocab)
 
             abstract_sentences = [""]
@@ -211,17 +261,17 @@ def example_generator(vocab, train_x_path, train_y_path, test_x_path, max_enc_le
         test_dataset = tf.data.TextLineDataset(test_x_path)
         for raw_record in test_dataset:
             # print('raw_record', raw_record)
-            print('raw_record length is:',raw_record.get_shape())
+            # print('raw_record length is:',raw_record.get_shape())
             article = raw_record.numpy().decode("utf-8")
-            print('article length is:', len(article)) #277
-            print(article)
-            print('max_enc_len value is :',max_enc_len)
-            print('article.split() length is:', len(article.split()))
+            # print('article length is:', len(article)) #277
+            # print(article)
+            # print('max_enc_len value is :',max_enc_len)
+            # print('article.split() length is:', len(article.split()))
             article_words = article.split()[:max_enc_len]
             enc_len = len(article_words)
 
             enc_input = [vocab.word_to_id(w) for w in article_words]
-            print('enc_input length in generator',len(enc_input)) #99
+            # print('enc_input length in generator',len(enc_input)) #99
             enc_input_extend_vocab, article_oovs = article_to_ids(article_words, vocab)
 
             sample_encoder_pad_mask = [1 for _ in range(enc_len)]

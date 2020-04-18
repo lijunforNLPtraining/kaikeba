@@ -36,7 +36,7 @@ def train(params):
         print("Initializing from scratch.")
 
     print("Starting the training ...")
-    train_model(model, b, params, ckpt, ckpt_manager)
+    train_model(model, b, params, ckpt_manager,vocab)
 
 
 if __name__ == '__main__':
